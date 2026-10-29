@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="640" viewBox="0 0 1100 640">
+  <rect width="1100" height="640" fill="#f4f0e6"/>
+  <text x="40" y="42" font-family="Segoe UI, sans-serif" font-size="22" font-weight="700" fill="#1c241f">ER-4803@0<<0 «!2O7L!5@28A», =>B0F8O Crow's Foot</text>
+  <text x="40" y="68" font-family="Segoe UI, sans-serif" font-size="14" fill="#3e4c46">>;L7>20B5;L A>740QB 70O2:8. 0@80=B @01>B, >?;0B0 8 AB0BCA 15@CBAO 87 A?@02>G=8:>2.</text>
+
+  <g font-family="Segoe UI, sans-serif" font-size="14" fill="#1c241f">
+    <rect x="40" y="160" width="250" height="300" rx="12" fill="#fffdf8" stroke="#0b4f4a" stroke-width="2"/>
+    <rect x="40" y="160" width="250" height="36" rx="12" fill="#0b4f4a"/>
+    <text x="56" y="184" fill="#ffffff" font-weight="700">users</text>
+    <text x="56" y="224">id PK</text>
+    <text x="56" y="248">login UQ</text>
+    <text x="56" y="272">password_hash</text>
+    <text x="56" y="296">full_name</text>
+    <text x="56" y="320">phone</text>
+    <text x="56" y="344">email</text>
+    <text x="56" y="368">role</text>
+    <text x="56" y="392">created_at</text>
+
+    <rect x="430" y="90" width="270" height="470" rx="12" fill="#fffdf8" stroke="#0b4f4a" stroke-width="2"/>
+    <rect x="430" y="90" width="270" height="36" rx="12" fill="#0b4f4a"/>
+    <text x="446" y="114" fill="#ffffff" font-weight="700">requests</text>
+    <text x="446" y="154">id PK</text>
+    <text x="446" y="178">user_id FK</text>
+    <text x="446" y="202">address</text>
+    <text x="446" y="226">apartment</text>
+    <text x="446" y="250">contact_phone</text>
+    <text x="446" y="274">problem</text>
+    <text x="446" y="298">work_type_id FK</text>
+    <text x="446" y="322">visit_date</text>
+    <text x="446" y="346">payment_type_id FK</text>
+    <text x="446" y="370">status_id FK</text>
+    <text x="446" y="394">created_at</text>
+    <text x="446" y="418">updated_at</text>
+
+    <rect x="840" y="90" width="220" height="100" rx="12" fill="#fffdf8" stroke="#0b4f4a" stroke-width="2"/>
+    <rect x="840" y="90" width="220" height="32" rx="12" fill="#0b4f4a"/>
+    <text x="854" y="112" fill="#ffffff" font-weight="700">work_types</text>
+    <text x="854" y="148">id PK</text>
+    <text x="854" y="172">name UQ</text>
+
+    <rect x="840" y="230" width="220" height="100" rx="12" fill="#fffdf8" stroke="#0b4f4a" stroke-width="2"/>
+    <rect x="840" y="230" width="220" height="32" rx="12" fill="#0b4f4a"/>
+    <text x="854" y="252" fill="#ffffff" font-weight="700">payment_types</text>
+    <text x="854" y="288">id PK</text>
+    <text x="854" y="312">name UQ</text>
+
+    <rect x="840" y="380" width="220" height="140" rx="12" fill="#fffdf8" stroke="#0b4f4a" stroke-width="2"/>
+    <rect x="840" y="380" width="220" height="32" rx="12" fill="#0b4f4a"/>
+    <text x="854" y="402" fill="#ffffff" font-weight="700">statuses</text>
+    <text x="854" y="438">id PK</text>
+    <text x="854" y="462">code UQ</text>
+    <text x="854" y="486">name</text>
+    <text x="854" y="510">sort_order</text>
+  </g>
+
+  <g stroke="#0b4f4a" stroke-width="2" fill="none">
+    <path d="M290 300 H400"/>
+    <path d="M400 292 v16 M388 292 v16"/>
+    <path d="M430 300 l-18 -10 M430 300 l-18 10 M430 300 h-18"/>
+    <path d="M700 150 H840"/>
+    <path d="M700 150 l18 -10 M700 150 l18 10 M700 150 h18"/>
+    <path d="M840 150 v-8 M828 142 h24"/>
+    <path d="M700 280 H840"/>
+    <path d="M700 280 l18 -10 M700 280 l18 10 M700 280 h18"/>
+    <path d="M840 280 v-8 M828 272 h24"/>
+    <path d="M700 450 H840"/>
+    <path d="M700 450 l18 -10 M700 450 l18 10 M700 450 h18"/>
+    <path d="M840 450 v-8 M828 442 h24"/>
+  </g>
+  <g font-family="Segoe UI, sans-serif" font-size="13" fill="#3e4c46">
+    <text x="300" y="292">1</text>
+    <text x="360" y="292">N</text>
+  </g>
+</svg>
