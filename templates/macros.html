@@ -1,0 +1,14 @@
+{% macro status_steps(code) %}
+<ol class="steps" aria-label="Ход заявки">
+  {% set current = {"new": 1, "in_progress": 2, "done": 3}[code] %}
+  {% for name, number in [("Новая", 1), ("В работе", 2), ("Выполнена", 3)] %}
+  <li class="{{ 'is-current' if number == current else ('is-done' if number < current else '') }}">{{ name }}</li>
+  {% endfor %}
+</ol>
+{% endmacro %}
+
+{% macro error(errors, name) %}
+{% if errors[name] %}
+<p id="{{ name }}-error" class="field__error">{{ errors[name] }}</p>
+{% endif %}
+{% endmacro %}

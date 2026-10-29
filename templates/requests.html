@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% from "macros.html" import status_steps %}
+{% block title %}Мои заявки{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Мои заявки</h1>
+    <p class="lead">Здесь только ваши обращения. Новая заявка сразу получает статус «Новая».</p>
+  </div>
+  <a class="btn btn--primary" href="{{ url_for('main.new_request') }}">Новая заявка</a>
+</div>
+{% if tickets %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>№</th>
+        <th>Создана</th>
+        <th>Адрес</th>
+        <th>Суть</th>
+        <th>Вариант</th>
+        <th>Визит</th>
+        <th>Оплата</th>
+        <th>Статус</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in tickets %}
+      <tr>
+        <td data-label="№">{{ item.id }}</td>
+        <td data-label="Создана">{{ item.created_at|dmy }}</td>
+        <td data-label="Адрес">{{ item.address }}, кв. {{ item.apartment }}</td>
+        <td data-label="Суть"><p class="clamp" title="{{ item.problem }}">{{ item.problem }}</p></td>
+        <td data-label="Вариант">{{ item.work_type }}</td>
+        <td data-label="Визит">{{ item.visit_date|dmy }}</td>
+        <td data-label="Оплата">{{ item.payment_type }}</td>
+        <td data-label="Статус">
+          <span class="badge badge--{{ item.status_code }}">{{ item.status_name }}</span>
+          {{ status_steps(item.status_code) }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<section class="card empty">
+  <h2>Заявок пока нет</h2>
+  <p>Создайте первую: укажите адрес, вариант работ, дату визита и оплату.</p>
+  <a class="btn btn--primary" href="{{ url_for('main.new_request') }}">Создать заявку</a>
+</section>
+{% endif %}
+{% endblock %}

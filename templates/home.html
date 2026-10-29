@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Заявки на ремонт{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="hero__copy">
+    <p class="eyebrow">Информационная система</p>
+    <h1>Заявка на ремонт или подключение за пару минут</h1>
+    <p class="lead">Абонент регистрируется, описывает проблему и следит за статусом. Диспетчер видит все заявки и переводит их: новая, в работе, выполнена.</p>
+    <div class="hero__actions">
+      {% if me %}
+        {% if me.role == "admin" %}
+        <a class="btn btn--primary" href="{{ url_for('main.admin') }}">Открыть панель</a>
+        {% else %}
+        <a class="btn btn--primary" href="{{ url_for('main.new_request') }}">Новая заявка</a>
+        <a class="btn btn--ghost" href="{{ url_for('main.my_requests') }}">Мои заявки</a>
+        {% endif %}
+      {% else %}
+        <a class="btn btn--primary" href="{{ url_for('main.register') }}">Создать аккаунт</a>
+        <a class="btn btn--ghost" href="{{ url_for('main.login') }}">У меня уже есть логин</a>
+      {% endif %}
+    </div>
+  </div>
+  <div class="hero__media" data-slider data-interval="3000">
+    <div class="slider" aria-roledescription="карусель" aria-label="Услуги связи">
+      <figure class="slider__slide is-active">
+        <img src="{{ url_for('static', filename='img/slide-1.jpg') }}" alt="Дом, к которому подведена линия связи" width="1200" height="675">
+        <figcaption>Подключение новой линии</figcaption>
+      </figure>
+      <figure class="slider__slide" aria-hidden="true">
+        <img src="{{ url_for('static', filename='img/slide-2.jpg') }}" alt="Кабель с муфтой на месте ремонта" width="1200" height="675" loading="lazy" decoding="async">
+        <figcaption>Ремонт линии</figcaption>
+      </figure>
+      <figure class="slider__slide" aria-hidden="true">
+        <img src="{{ url_for('static', filename='img/slide-3.jpg') }}" alt="Маршрутизатор с индикаторами" width="1200" height="675" loading="lazy" decoding="async">
+        <figcaption>Настройка оборудования</figcaption>
+      </figure>
+      <figure class="slider__slide" aria-hidden="true">
+        <img src="{{ url_for('static', filename='img/slide-4.jpg') }}" alt="Метка на карте и календарь визита" width="1200" height="675" loading="lazy" decoding="async">
+        <figcaption>Выезд в согласованный день</figcaption>
+      </figure>
+      <button class="slider__nav slider__nav--prev" type="button" data-prev aria-label="Предыдущий слайд">
+        <span aria-hidden="true">←</span>
+      </button>
+      <button class="slider__nav slider__nav--next" type="button" data-next aria-label="Следующий слайд">
+        <span aria-hidden="true">→</span>
+      </button>
+    </div>
+    <div class="slider__dots">
+      <button type="button" data-go="0" aria-label="Слайд 1" aria-current="true"></button>
+      <button type="button" data-go="1" aria-label="Слайд 2"></button>
+      <button type="button" data-go="2" aria-label="Слайд 3"></button>
+      <button type="button" data-go="3" aria-label="Слайд 4"></button>
+    </div>
+  </div>
+</section>
+<section class="grid-3" aria-label="Как устроена работа">
+  <article class="card">
+    <h2>1. Регистрация</h2>
+    <p>Логин, пароль, ФИО, телефон и email. Логин уникален, пустые поля не принимаются.</p>
+  </article>
+  <article class="card">
+    <h2>2. Заявка</h2>
+    <p>Адрес, квартира, описание, вариант работ, дата визита и способ оплаты.</p>
+  </article>
+  <article class="card">
+    <h2>3. Статус</h2>
+    <p>Диспетчер фильтрует список и отмечает ход: новая, в работе или выполнена.</p>
+  </article>
+</section>
+{% endblock %}

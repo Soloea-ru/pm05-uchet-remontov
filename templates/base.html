@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Главная{% endblock %} · СвязьСервис</title>
+  <meta name="description" content="Учебная информационная система учёта заявок на ремонт и подключение.">
+  <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <a class="skip" href="#content">К содержанию</a>
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="logo" href="{{ url_for('main.home') }}">
+        <svg class="logo__mark" viewBox="0 0 32 32" aria-hidden="true">
+          <rect width="32" height="32" rx="8" fill="#0b4f4a"/>
+          <path d="M7 21c5-9 13-9 18 0" fill="none" stroke="#f4f0e6" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="16" cy="23" r="2.2" fill="#e7b15a"/>
+        </svg>
+        <span>СвязьСервис</span>
+      </a>
+      <nav class="nav" aria-label="Разделы">
+        <a href="{{ url_for('main.home') }}">Главная</a>
+        <a href="{{ url_for('main.guide') }}">UI-гайд</a>
+        {% if me %}
+          {% if me.role == "admin" %}
+          <a href="{{ url_for('main.admin') }}">Все заявки</a>
+          {% else %}
+          <a href="{{ url_for('main.my_requests') }}">Мои заявки</a>
+          <a href="{{ url_for('main.new_request') }}">Новая заявка</a>
+          {% endif %}
+          <span class="who">{{ me.full_name }}</span>
+          <form method="post" action="{{ url_for('main.logout') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf }}">
+            <button class="btn btn--ghost" type="submit">Выйти</button>
+          </form>
+        {% else %}
+          <a href="{{ url_for('main.login') }}">Вход</a>
+          <a class="btn btn--primary" href="{{ url_for('main.register') }}">Регистрация</a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+  <main id="content" class="wrap">
+    {% block content %}{% endblock %}
+  </main>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="toasts" aria-live="polite">
+    {% for category, message in messages %}
+    <div class="toast toast--{{ category }}" role="status">
+      <span>{{ message }}</span>
+      <button type="button" data-close aria-label="Закрыть уведомление">×</button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endwith %}
+  <footer class="site-footer">
+    <div class="wrap">
+      <p>Учебный проект ПМ.05. Заявки на ремонт и подключение. Данные в базе вымышленные.</p>
+    </div>
+  </footer>
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

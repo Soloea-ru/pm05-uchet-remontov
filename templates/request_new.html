@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% from "macros.html" import error %}
+{% block title %}Новая заявка{% endblock %}
+{% block content %}
+<section class="narrow card">
+  <h1>Новая заявка</h1>
+  <p class="lead">Вариант работ, дата визита и оплата обязательны вместе с адресом и описанием.</p>
+  <form method="post" action="{{ url_for('main.new_request') }}" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <div class="form-grid form-grid--2">
+      <div class="field span-2">
+        <label for="address">Адрес</label>
+        <input id="address" name="address" required maxlength="200" value="{{ form.address }}" placeholder="г. Фрязино, ул. Учебная, д. 1" {% if errors.address %}aria-invalid="true" aria-describedby="address-error"{% endif %}>
+        {{ error(errors, "address") }}
+      </div>
+      <div class="field">
+        <label for="apartment">Квартира</label>
+        <input id="apartment" name="apartment" required maxlength="10" value="{{ form.apartment }}" {% if errors.apartment %}aria-invalid="true" aria-describedby="apartment-error"{% endif %}>
+        {{ error(errors, "apartment") }}
+      </div>
+      <div class="field">
+        <label for="contact_phone">Телефон для связи</label>
+        <input id="contact_phone" name="contact_phone" type="tel" inputmode="tel" required maxlength="20" value="{{ form.contact_phone }}" {% if errors.contact_phone %}aria-invalid="true" aria-describedby="contact_phone-error"{% endif %}>
+        {{ error(errors, "contact_phone") }}
+      </div>
+      <div class="field span-2">
+        <label for="problem">Проблема</label>
+        <textarea id="problem" name="problem" required maxlength="2000" {% if errors.problem %}aria-invalid="true" aria-describedby="problem-error"{% endif %}>{{ form.problem }}</textarea>
+        {{ error(errors, "problem") }}
+      </div>
+      <div class="field">
+        <label for="work_type_id">Вариант работ</label>
+        <select id="work_type_id" name="work_type_id" required {% if errors.work_type_id %}aria-invalid="true" aria-describedby="work_type_id-error"{% endif %}>
+          <option value="">Выберите</option>
+          {% for item in work_types %}
+          <option value="{{ item.id }}" {% if form.work_type_id|string == item.id|string %}selected{% endif %}>{{ item.name }}</option>
+          {% endfor %}
+        </select>
+        {{ error(errors, "work_type_id") }}
+      </div>
+      <div class="field">
+        <label for="visit_date">Дата визита</label>
+        <input id="visit_date" name="visit_date" type="date" required min="{{ today }}" value="{{ form.visit_date }}" {% if errors.visit_date %}aria-invalid="true" aria-describedby="visit_date-error"{% endif %}>
+        {{ error(errors, "visit_date") }}
+      </div>
+      <div class="field span-2">
+        <label for="payment_type_id">Оплата</label>
+        <select id="payment_type_id" name="payment_type_id" required {% if errors.payment_type_id %}aria-invalid="true" aria-describedby="payment_type_id-error"{% endif %}>
+          <option value="">Выберите</option>
+          {% for item in payment_types %}
+          <option value="{{ item.id }}" {% if form.payment_type_id|string == item.id|string %}selected{% endif %}>{{ item.name }}</option>
+          {% endfor %}
+        </select>
+        {{ error(errors, "payment_type_id") }}
+      </div>
+    </div>
+    <button class="btn btn--primary" type="submit">Отправить заявку</button>
+  </form>
+</section>
+{% endblock %}

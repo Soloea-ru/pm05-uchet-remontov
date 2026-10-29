@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Все заявки{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Все заявки</h1>
+    <p class="lead">Найдено: {{ total }}. Статус меняется здесь же, фильтр и страницы сохраняются.</p>
+  </div>
+</div>
+<form class="filters card" method="get" action="{{ url_for('main.admin') }}">
+  <div class="field">
+    <label for="status">Статус</label>
+    <select id="status" name="status">
+      <option value="">Все</option>
+      {% for item in statuses %}
+      <option value="{{ item.code }}" {% if filters.status == item.code %}selected{% endif %}>{{ item.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label for="work_type">Вариант работ</label>
+    <select id="work_type" name="work_type">
+      <option value="">Все</option>
+      {% for item in work_types %}
+      <option value="{{ item.id }}" {% if filters.work_type == item.id|string %}selected{% endif %}>{{ item.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label for="q">Поиск</label>
+    <input id="q" name="q" value="{{ filters.q }}" placeholder="Адрес, телефон, фамилия">
+  </div>
+  <button class="btn btn--primary" type="submit">Показать</button>
+</form>
+{% if tickets %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>№</th>
+        <th>Создана</th>
+        <th>Абонент</th>
+        <th>Адрес</th>
+        <th>Вариант</th>
+        <th>Визит</th>
+        <th>Оплата</th>
+        <th>Статус</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in tickets %}
+      <tr>
+        <td data-label="№">{{ item.id }}</td>
+        <td data-label="Создана">{{ item.created_at|dmy }}</td>
+        <td data-label="Абонент">{{ item.full_name }}<br><span class="muted">{{ item.user_login }} · {{ item.contact_phone }}</span></td>
+        <td data-label="Адрес">{{ item.address }}, кв. {{ item.apartment }}<p class="clamp" title="{{ item.problem }}">{{ item.problem }}</p></td>
+        <td data-label="Вариант">{{ item.work_type }}</td>
+        <td data-label="Визит">{{ item.visit_date|dmy }}</td>
+        <td data-label="Оплата">{{ item.payment_type }}</td>
+        <td data-label="Статус">
+          <form method="post" action="{{ url_for('main.set_status', ticket_id=item.id) }}" class="status-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf }}">
+            <input type="hidden" name="q" value="{{ filters.q }}">
+            <input type="hidden" name="status" value="{{ filters.status }}">
+            <input type="hidden" name="work_type" value="{{ filters.work_type }}">
+            <input type="hidden" name="page" value="{{ page }}">
+            <label class="visually-hidden" for="status-{{ item.id }}">Статус заявки {{ item.id }}</label>
+            <select id="status-{{ item.id }}" name="status_id">
+              {% for st in statuses %}
+              <option value="{{ st.id }}" {% if st.id == item.status_id %}selected{% endif %}>{{ st.name }}</option>
+              {% endfor %}
+            </select>
+            <button class="btn btn--ghost" type="submit">Сохранить</button>
+          </form>
+          {% if item.updated_at %}<p class="muted">Обновлено {{ item.updated_at|dmy }}</p>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<section class="card empty">
+  <h2>По этому фильтру заявок нет</h2>
+  <p>Сбросьте статус или поиск, чтобы увидеть весь список.</p>
+</section>
+{% endif %}
+{% if pages > 1 %}
+<nav class="pager" aria-label="Страницы списка">
+  {% if page > 1 %}
+  <a class="btn btn--ghost" href="{{ url_for('main.admin', page=page-1, q=filters.q, status=filters.status, work_type=filters.work_type) }}">Назад</a>
+  {% endif %}
+  <span>Страница {{ page }} из {{ pages }}</span>
+  {% if page < pages %}
+  <a class="btn btn--ghost" href="{{ url_for('main.admin', page=page+1, q=filters.q, status=filters.status, work_type=filters.work_type) }}">Дальше</a>
+  {% endif %}
+</nav>
+{% endif %}
+{% endblock %}

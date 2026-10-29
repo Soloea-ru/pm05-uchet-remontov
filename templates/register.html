@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% from "macros.html" import error %}
+{% block title %}Регистрация{% endblock %}
+{% block content %}
+<section class="narrow card">
+  <h1>Регистрация</h1>
+  <p class="lead">Все поля обязательны. Логин проверяется на уникальность до отправки.</p>
+  <form method="post" action="{{ url_for('main.register') }}" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <div class="field">
+      <label for="login">Логин</label>
+      <input id="login" name="login" autocomplete="username" required maxlength="32" value="{{ form.login }}" data-login-check {% if errors.login %}aria-invalid="true" aria-describedby="login-error"{% endif %}>
+      {{ error(errors, "login") }}
+      <p class="field__hint" data-login-hint hidden></p>
+    </div>
+    <div class="form-grid form-grid--2">
+      <div class="field">
+        <label for="password">Пароль</label>
+        <input id="password" name="password" type="password" autocomplete="new-password" required minlength="8" {% if errors.password %}aria-invalid="true" aria-describedby="password-error"{% endif %}>
+        {{ error(errors, "password") }}
+      </div>
+      <div class="field">
+        <label for="password2">Пароль ещё раз</label>
+        <input id="password2" name="password2" type="password" autocomplete="new-password" required {% if errors.password2 %}aria-invalid="true" aria-describedby="password2-error"{% endif %}>
+        {{ error(errors, "password2") }}
+      </div>
+    </div>
+    <div class="field">
+      <label for="full_name">ФИО</label>
+      <input id="full_name" name="full_name" autocomplete="name" required maxlength="120" value="{{ form.full_name }}" {% if errors.full_name %}aria-invalid="true" aria-describedby="full_name-error"{% endif %}>
+      {{ error(errors, "full_name") }}
+    </div>
+    <div class="form-grid form-grid--2">
+      <div class="field">
+        <label for="phone">Телефон</label>
+        <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" required maxlength="20" placeholder="+7 900 000-00-00" value="{{ form.phone }}" {% if errors.phone %}aria-invalid="true" aria-describedby="phone-error"{% endif %}>
+        {{ error(errors, "phone") }}
+      </div>
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="email" required maxlength="120" value="{{ form.email }}" {% if errors.email %}aria-invalid="true" aria-describedby="email-error"{% endif %}>
+        {{ error(errors, "email") }}
+      </div>
+    </div>
+    <button class="btn btn--primary" type="submit">Зарегистрироваться</button>
+  </form>
+  <p class="form-note">Уже есть логин? <a href="{{ url_for('main.login') }}">Войти</a></p>
+</section>
+{% endblock %}

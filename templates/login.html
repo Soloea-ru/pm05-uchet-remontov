@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Вход{% endblock %}
+{% block content %}
+<section class="narrow card">
+  <h1>Вход</h1>
+  <p class="lead">Диспетчер попадает в общий список, абонент — к своим заявкам.</p>
+  {% if error %}
+  <p class="banner" role="alert">{{ error }}</p>
+  {% endif %}
+  <form method="post" action="{{ url_for('main.login') }}" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <div class="field">
+      <label for="login">Логин</label>
+      <input id="login" name="login" autocomplete="username" required value="{{ form_login }}" {% if error %}aria-invalid="true" aria-describedby="login-alert"{% endif %}>
+    </div>
+    <div class="field">
+      <label for="password">Пароль</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required {% if error %}aria-invalid="true"{% endif %}>
+    </div>
+    {% if error %}<p id="login-alert" class="visually-hidden">{{ error }}</p>{% endif %}
+    <button class="btn btn--primary" type="submit">Войти</button>
+  </form>
+  <p class="form-note">Нет аккаунта? <a href="{{ url_for('main.register') }}">Регистрация</a></p>
+  <p class="form-note">Учебные входы: admin / Admin123! · demo / Demo123! · maria / Maria123!</p>
+</section>
+{% endblock %}

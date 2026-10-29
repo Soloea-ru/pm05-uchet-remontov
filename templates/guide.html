@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}UI-гайд{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <h1>UI-гайд</h1>
+    <p class="lead">Короткая шпаргалка по цвету, шрифту и сетке. Подробности лежат в docs/ui-guide.md.</p>
+  </div>
+</section>
+<section class="card">
+  <h2>Цвет</h2>
+  <ul class="swatches">
+    <li><i class="swatch swatch--bg"></i><span>Фон #f4f0e6</span></li>
+    <li><i class="swatch swatch--card"></i><span>Карточка #fffdf8</span></li>
+    <li><i class="swatch swatch--ink"></i><span>Текст #1c241f</span></li>
+    <li><i class="swatch swatch--teal"></i><span>Акцент #0b4f4a</span></li>
+    <li><i class="swatch swatch--amber"></i><span>Внимание #8a4b08</span></li>
+    <li><i class="swatch swatch--green"></i><span>Готово #14663a</span></li>
+  </ul>
+</section>
+<section class="grid-3">
+  <article class="card">
+    <h2>Шрифт</h2>
+    <p class="display-sample">Candara для заголовков</p>
+    <p>Segoe UI для текста, кнопок и полей. На телефоне 390×844 кегль основного текста не меньше 16px.</p>
+  </article>
+  <article class="card">
+    <h2>Сетка</h2>
+    <p>Колонка до 1120px, поля 16px на узком экране и 24px на широком. Карточки встают в один столбец, когда ширины не хватает на три.</p>
+  </article>
+  <article class="card">
+    <h2>Состояния</h2>
+    <p><span class="badge badge--new">Новая</span> <span class="badge badge--in_progress">В работе</span> <span class="badge badge--done">Выполнена</span></p>
+    <p><button class="btn btn--primary" type="button">Основное</button> <button class="btn btn--ghost" type="button">Тихое</button></p>
+  </article>
+</section>
+{% endblock %}
