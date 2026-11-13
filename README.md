@@ -56,7 +56,9 @@ py -3 -m venv .venv
 
 Откройте http://127.0.0.1:5000
 
-## Проверки
+## Проверки и эксплуатация
+
+Как запустить, войти, работать со списками, формами и журналом, типовые ошибки, оценка качества и рекомендации: `docs/operations.md`.
 
 Методика, критерии качества/надёжности, состав оборудования и таблица прогона (шаг → ожидание → факт): `docs/testing.md`.
 
@@ -105,6 +107,7 @@ py -3 -m venv .venv
 | 4. MySQL и ORM | `app/config.py`, `app/models.py`, `docker-compose.yml`, `.env.example` |
 | 5. CRUD и журнал | `app/admin.py`, `app/journal.py`, `sql/migration_admin_journal.sql`, `templates/admin_*.html` |
 | 6. Тестирование и критерии | `docs/testing.md`, `docs/checklist.md`, `tests/test_app.py` |
+| 7. Эксплуатация и оценка | `docs/operations.md` |
 
 Слайдер на главной: 4 кадра 1200×675, автопрокрутка 3 секунды, кнопки назад и вперёд. Макет сжимается под ширину 390px.
 
