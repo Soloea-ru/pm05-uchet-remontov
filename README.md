@@ -108,7 +108,6 @@ py -3 -m venv .venv
 | 5. CRUD и журнал | `app/admin.py`, `app/journal.py`, `sql/migration_admin_journal.sql`, `templates/admin_*.html` |
 | 6. Тестирование и критерии | `docs/testing.md`, `docs/checklist.md`, `tests/test_app.py` |
 | 7. Эксплуатация и оценка | `docs/operations.md` |
-| 8. Отчёт по практике (PowerPoint) | `docs/pm05-otchet-praktiki.pptx`, `docs/images/report/` |
 
 Слайдер на главной: 4 кадра 1200×675, автопрокрутка 3 секунды, кнопки назад и вперёд. Макет сжимается под ширину 390px.
 
