@@ -1,15 +1,19 @@
-import os
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 from flask import Flask, render_template
 
-ROOT = Path(__file__).resolve().parent.parent
+from .config import Config, ROOT, load_env_file
+from .models import db, init_db
 
 
 def format_dmy(value):
-    if not value:
+    if value is None or value == "":
         return "—"
+    if isinstance(value, datetime):
+        return value.strftime("%d.%m.%Y %H:%M")
+    if isinstance(value, date):
+        return value.strftime("%d.%m.%Y")
     text = str(value)
     try:
         if len(text) > 10:
@@ -20,24 +24,29 @@ def format_dmy(value):
 
 
 def create_app(config=None):
+    load_env_file()
     app = Flask(
         __name__,
         template_folder=str(ROOT / "templates"),
         static_folder=str(ROOT / "static"),
     )
-    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "pm05-dev-key")
-    app.config["DATABASE"] = str(ROOT / "instance" / "app.db")
-    app.config["SESSION_COOKIE_HTTPONLY"] = True
-    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    Config.apply(app)
     if config:
         app.config.update(config)
 
-    Path(app.config["DATABASE"]).parent.mkdir(parents=True, exist_ok=True)
+    uri = app.config["SQLALCHEMY_DATABASE_URI"]
+    engine_options = dict(app.config.get("SQLALCHEMY_ENGINE_OPTIONS") or {})
+    if uri.startswith("sqlite"):
+        connect_args = dict(engine_options.get("connect_args") or {})
+        connect_args["check_same_thread"] = False
+        engine_options["connect_args"] = connect_args
+        Path(app.instance_path).mkdir(parents=True, exist_ok=True)
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = engine_options
 
-    from .db import close_db, init_db
+    db.init_app(app)
+
     from .routes import bp, inject_template_context
 
-    app.teardown_appcontext(close_db)
     app.context_processor(inject_template_context)
     app.register_blueprint(bp)
     app.add_template_filter(format_dmy, "dmy")
@@ -69,7 +78,6 @@ def create_app(config=None):
             message="Обновите страницу и отправьте форму ещё раз.",
         ), 400
 
-    if not Path(app.config["DATABASE"]).exists():
-        with app.app_context():
-            init_db()
+    with app.app_context():
+        init_db()
     return app

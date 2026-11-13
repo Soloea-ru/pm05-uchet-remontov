@@ -1,12 +1,46 @@
+import os
 import re
 import tempfile
 import unittest
 from datetime import date, timedelta
 from pathlib import Path
+from unittest.mock import patch
+
+from sqlalchemy import select
 
 from app import create_app
-from app.db import close_db, get_db
+from app.config import mysql_uri
+from app.models import Request, Status, db
 from app.validators import validate_registration, validate_ticket
+
+
+class ConfigTests(unittest.TestCase):
+    def test_database_url_wins_over_mysql_parts(self):
+        env = {
+            "DATABASE_URL": "mysql+pymysql://a:b@db:3306/app?charset=utf8mb4",
+            "MYSQL_USER": "ignored",
+            "MYSQL_PASSWORD": "ignored",
+            "MYSQL_HOST": "127.0.0.1",
+            "MYSQL_PORT": "3306",
+            "MYSQL_DATABASE": "svyazservice",
+        }
+        with patch.dict(os.environ, env, clear=False):
+            self.assertEqual(mysql_uri(), env["DATABASE_URL"])
+
+    def test_mysql_password_is_url_quoted(self):
+        env = {
+            "DATABASE_URL": "",
+            "MYSQL_USER": "svyaz",
+            "MYSQL_PASSWORD": "p@ss:w/rd",
+            "MYSQL_HOST": "127.0.0.1",
+            "MYSQL_PORT": "3306",
+            "MYSQL_DATABASE": "svyazservice",
+        }
+        with patch.dict(os.environ, env, clear=False):
+            self.assertEqual(
+                mysql_uri(),
+                "mysql+pymysql://svyaz:p%40ss%3Aw%2Frd@127.0.0.1:3306/svyazservice?charset=utf8mb4",
+            )
 
 
 class ValidatorTests(unittest.TestCase):
@@ -47,7 +81,7 @@ class FlowTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.app = create_app({
-            "DATABASE": str(Path(self.tmp.name) / "test.db"),
+            "SQLALCHEMY_DATABASE_URI": "sqlite:///" + str(Path(self.tmp.name) / "test.db"),
             "TESTING": True,
             "SECRET_KEY": "test-secret",
         })
@@ -55,7 +89,8 @@ class FlowTests(unittest.TestCase):
 
     def tearDown(self):
         with self.app.app_context():
-            close_db()
+            db.session.remove()
+            db.engine.dispose()
         self.tmp.cleanup()
 
     def token(self, path):
@@ -139,7 +174,7 @@ class FlowTests(unittest.TestCase):
 
         token = self.token("/admin")
         with self.app.app_context():
-            done_id = get_db().execute("SELECT id FROM statuses WHERE code = 'done'").fetchone()["id"]
+            done_id = db.session.execute(select(Status.id).where(Status.code == "done")).scalar_one()
         changed = self.client.post("/admin/requests/1/status", data={
             "csrf_token": token,
             "status_id": done_id,
@@ -150,13 +185,9 @@ class FlowTests(unittest.TestCase):
         }, follow_redirects=True)
         self.assertIn("статус изменён", changed.get_data(as_text=True))
         with self.app.app_context():
-            code = get_db().execute(
-                """
-                SELECT s.code FROM requests r
-                JOIN statuses s ON s.id = r.status_id
-                WHERE r.id = 1
-                """
-            ).fetchone()["code"]
+            code = db.session.execute(
+                select(Status.code).join(Request, Request.status_id == Status.id).where(Request.id == 1)
+            ).scalar_one()
         self.assertEqual(code, "done")
 
     def test_login_check_api(self):

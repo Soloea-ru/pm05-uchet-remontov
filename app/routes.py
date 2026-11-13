@@ -1,28 +1,22 @@
 import secrets
-from datetime import date
+from datetime import date, datetime
 
 from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, session, url_for
+from sqlalchemy import and_, func, or_, select, update
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from .db import get_db
+from .models import PaymentType, Request, Status, User, WorkType, db, tickets_select
 from .validators import LOGIN_RE, validate_registration, validate_ticket
 
 bp = Blueprint("main", __name__)
 
 PER_PAGE = 5
 
-TICKET_SQL = """
-SELECT r.id, r.address, r.apartment, r.contact_phone, r.problem,
-       r.visit_date, r.created_at, r.updated_at, r.user_id,
-       u.full_name, u.login AS user_login,
-       wt.name AS work_type, pt.name AS payment_type,
-       s.name AS status_name, s.code AS status_code, s.id AS status_id
-FROM requests r
-JOIN users u ON u.id = r.user_id
-JOIN work_types wt ON wt.id = r.work_type_id
-JOIN payment_types pt ON pt.id = r.payment_type_id
-JOIN statuses s ON s.id = r.status_id
-"""
+LOOKUP = {
+    "work_types": WorkType,
+    "payment_types": PaymentType,
+    "statuses": Status,
+}
 
 
 def inject_template_context():
@@ -35,7 +29,7 @@ def current_user():
     user_id = session.get("user_id")
     if not user_id:
         return None
-    return get_db().execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    return db.session.get(User, user_id)
 
 
 @bp.before_request
@@ -71,27 +65,21 @@ def register():
         errors, cleaned = validate_registration(request.form)
         form = cleaned
         if not errors:
-            db = get_db()
-            taken = db.execute(
-                "SELECT id FROM users WHERE login = ?", (cleaned["login"],)
-            ).fetchone()
+            taken = db.session.execute(
+                select(User.id).where(User.login == cleaned["login"])
+            ).scalar_one_or_none()
             if taken:
                 errors["login"] = "Такой логин уже занят."
             else:
-                db.execute(
-                    """
-                    INSERT INTO users (login, password_hash, full_name, phone, email, role)
-                    VALUES (?, ?, ?, ?, ?, 'user')
-                    """,
-                    (
-                        cleaned["login"],
-                        generate_password_hash(cleaned["password"], method="pbkdf2:sha256"),
-                        cleaned["full_name"],
-                        cleaned["phone"],
-                        cleaned["email"],
-                    ),
-                )
-                db.commit()
+                db.session.add(User(
+                    login=cleaned["login"],
+                    password_hash=generate_password_hash(cleaned["password"], method="pbkdf2:sha256"),
+                    full_name=cleaned["full_name"],
+                    phone=cleaned["phone"],
+                    email=cleaned["email"],
+                    role="user",
+                ))
+                db.session.commit()
                 flash("Аккаунт создан. Войдите, используя логин и пароль.", "success")
                 return redirect(url_for("main.login"))
     return render_template("register.html", errors=errors, form=form), (400 if errors else 200)
@@ -108,12 +96,14 @@ def login():
         password = request.form.get("password", "")
         user = None
         if form_login:
-            user = get_db().execute("SELECT * FROM users WHERE login = ?", (form_login,)).fetchone()
-        if not user or not check_password_hash(user["password_hash"], password):
+            user = db.session.execute(
+                select(User).where(User.login == form_login)
+            ).scalar_one_or_none()
+        if not user or not check_password_hash(user.password_hash, password):
             error = "Неверный логин или пароль."
         else:
             session.clear()
-            session["user_id"] = user["id"]
+            session["user_id"] = user.id
             session["csrf"] = secrets.token_hex(16)
             return _home_for_role()
     status = 400 if error else 200
@@ -131,7 +121,7 @@ def login_available():
     login_value = " ".join(request.args.get("login", "").split()).lower()
     if not LOGIN_RE.match(login_value):
         return jsonify(available=False, reason="format")
-    taken = get_db().execute("SELECT id FROM users WHERE login = ?", (login_value,)).fetchone()
+    taken = db.session.execute(select(User.id).where(User.login == login_value)).scalar_one_or_none()
     return jsonify(available=taken is None)
 
 
@@ -140,10 +130,9 @@ def my_requests():
     user, response = _subscriber()
     if response:
         return response
-    tickets = get_db().execute(
-        TICKET_SQL + " WHERE r.user_id = ? ORDER BY r.created_at DESC, r.id DESC",
-        (user["id"],),
-    ).fetchall()
+    tickets = db.session.execute(
+        tickets_select().where(Request.user_id == user.id).order_by(Request.created_at.desc(), Request.id.desc())
+    ).all()
     return render_template("requests.html", tickets=tickets)
 
 
@@ -152,40 +141,37 @@ def new_request():
     user, response = _subscriber()
     if response:
         return response
-    db = get_db()
     errors = {}
-    form = {"contact_phone": user["phone"], "address": "", "apartment": "", "problem": "", "visit_date": ""}
+    form = {"contact_phone": user.phone, "address": "", "apartment": "", "problem": "", "visit_date": ""}
     if request.method == "POST":
         errors, form = validate_ticket(request.form)
         if not errors:
-            if not _exists(db, "work_types", form["work_type_id"]):
+            if not _exists("work_types", form["work_type_id"]):
                 errors["work_type_id"] = "Выберите вариант работ."
-            if not _exists(db, "payment_types", form["payment_type_id"]):
+            if not _exists("payment_types", form["payment_type_id"]):
                 errors["payment_type_id"] = "Выберите способ оплаты."
         if not errors:
-            new_status = db.execute("SELECT id FROM statuses WHERE code = 'new'").fetchone()
-            db.execute(
-                """
-                INSERT INTO requests (
-                    user_id, address, apartment, contact_phone, problem,
-                    work_type_id, visit_date, payment_type_id, status_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    user["id"], form["address"], form["apartment"], form["contact_phone"],
-                    form["problem"], form["work_type_id"], form["visit_date"],
-                    form["payment_type_id"], new_status["id"],
-                ),
-            )
-            db.commit()
+            new_status = db.session.execute(select(Status).where(Status.code == "new")).scalar_one()
+            db.session.add(Request(
+                user_id=user.id,
+                address=form["address"],
+                apartment=form["apartment"],
+                contact_phone=form["contact_phone"],
+                problem=form["problem"],
+                work_type_id=form["work_type_id"],
+                visit_date=date.fromisoformat(form["visit_date"]),
+                payment_type_id=form["payment_type_id"],
+                status_id=new_status.id,
+            ))
+            db.session.commit()
             flash("Заявка отправлена. Диспетчер увидит её в общем списке.", "success")
             return redirect(url_for("main.my_requests"))
     return render_template(
         "request_new.html",
         errors=errors,
         form=form,
-        work_types=db.execute("SELECT id, name FROM work_types ORDER BY name").fetchall(),
-        payment_types=db.execute("SELECT id, name FROM payment_types ORDER BY id").fetchall(),
+        work_types=db.session.execute(select(WorkType).order_by(WorkType.name)).scalars().all(),
+        payment_types=db.session.execute(select(PaymentType).order_by(PaymentType.id)).scalars().all(),
         today=date.today().isoformat(),
     ), (400 if errors else 200)
 
@@ -195,24 +181,34 @@ def admin():
     user = current_user()
     if not user:
         return redirect(url_for("main.login"))
-    if user["role"] != "admin":
+    if user.role != "admin":
         abort(403)
-    db = get_db()
-    where, params, filters = _filters(request.args)
-    total = db.execute(f"SELECT COUNT(*) AS n FROM requests r JOIN users u ON u.id = r.user_id JOIN work_types wt ON wt.id = r.work_type_id JOIN statuses s ON s.id = r.status_id {where}", params).fetchone()["n"]
+    clauses, filters = _filters(request.args)
+    count_stmt = (
+        select(func.count())
+        .select_from(Request)
+        .join(User, User.id == Request.user_id)
+        .join(WorkType, WorkType.id == Request.work_type_id)
+        .join(Status, Status.id == Request.status_id)
+    )
+    list_stmt = tickets_select()
+    if clauses:
+        condition = and_(*clauses)
+        count_stmt = count_stmt.where(condition)
+        list_stmt = list_stmt.where(condition)
+    total = db.session.execute(count_stmt).scalar_one()
     pages = max(1, (total + PER_PAGE - 1) // PER_PAGE)
     page = request.args.get("page", 1, type=int) or 1
     page = min(max(page, 1), pages)
     offset = (page - 1) * PER_PAGE
-    tickets = db.execute(
-        TICKET_SQL + f" {where} ORDER BY r.created_at DESC, r.id DESC LIMIT ? OFFSET ?",
-        (*params, PER_PAGE, offset),
-    ).fetchall()
+    tickets = db.session.execute(
+        list_stmt.order_by(Request.created_at.desc(), Request.id.desc()).limit(PER_PAGE).offset(offset)
+    ).all()
     return render_template(
         "admin.html",
         tickets=tickets,
-        statuses=db.execute("SELECT id, code, name FROM statuses ORDER BY sort_order").fetchall(),
-        work_types=db.execute("SELECT id, name FROM work_types ORDER BY name").fetchall(),
+        statuses=db.session.execute(select(Status).order_by(Status.sort_order)).scalars().all(),
+        work_types=db.session.execute(select(WorkType).order_by(WorkType.name)).scalars().all(),
         filters=filters,
         page=page,
         pages=pages,
@@ -225,23 +221,19 @@ def set_status(ticket_id):
     user = current_user()
     if not user:
         return redirect(url_for("main.login"))
-    if user["role"] != "admin":
+    if user.role != "admin":
         abort(403)
-    db = get_db()
     status_id = request.form.get("status_id", type=int)
-    if not status_id or not _exists(db, "statuses", status_id):
+    if not status_id or not _exists("statuses", status_id):
         flash("Выберите статус из списка.", "error")
     else:
-        updated = db.execute(
-            """
-            UPDATE requests
-            SET status_id = ?, updated_at = datetime('now', 'localtime')
-            WHERE id = ?
-            """,
-            (status_id, ticket_id),
+        result = db.session.execute(
+            update(Request)
+            .where(Request.id == ticket_id)
+            .values(status_id=status_id, updated_at=datetime.now())
         )
-        db.commit()
-        if updated.rowcount:
+        db.session.commit()
+        if result.rowcount:
             flash(f"Заявка №{ticket_id}: статус изменён.", "success")
         else:
             flash("Заявка не найдена.", "error")
@@ -256,7 +248,7 @@ def set_status(ticket_id):
 
 def _home_for_role():
     user = current_user()
-    if user and user["role"] == "admin":
+    if user and user.role == "admin":
         return redirect(url_for("main.admin"))
     if user:
         return redirect(url_for("main.my_requests"))
@@ -267,39 +259,37 @@ def _subscriber():
     user = current_user()
     if not user:
         return None, redirect(url_for("main.login"))
-    if user["role"] == "admin":
+    if user.role == "admin":
         return None, redirect(url_for("main.admin"))
     return user, None
 
 
-def _exists(db, table, row_id):
-    if table not in {"work_types", "payment_types", "statuses"}:
+def _exists(table, row_id):
+    model = LOOKUP.get(table)
+    if model is None:
         raise ValueError(table)
-    return db.execute(f"SELECT id FROM {table} WHERE id = ?", (row_id,)).fetchone()
+    return db.session.get(model, row_id) is not None
 
 
 def _filters(args):
     clauses = []
-    params = []
     status = (args.get("status") or "").strip()
     work_type = (args.get("work_type") or "").strip()
     query = (args.get("q") or "").strip()
     if status:
-        clauses.append("s.code = ?")
-        params.append(status)
+        clauses.append(Status.code == status)
     if work_type.isdigit():
-        clauses.append("r.work_type_id = ?")
-        params.append(int(work_type))
+        clauses.append(Request.work_type_id == int(work_type))
     if query:
         pattern = _like(query)
-        clauses.append(
-            "(r.address LIKE ? ESCAPE '\\' OR r.problem LIKE ? ESCAPE '\\' "
-            "OR u.full_name LIKE ? ESCAPE '\\' OR r.contact_phone LIKE ? ESCAPE '\\' "
-            "OR u.login LIKE ? ESCAPE '\\')"
-        )
-        params.extend([pattern] * 5)
-    where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
-    return where, params, {"status": status, "work_type": work_type, "q": query}
+        clauses.append(or_(
+            Request.address.like(pattern, escape="\\"),
+            Request.problem.like(pattern, escape="\\"),
+            User.full_name.like(pattern, escape="\\"),
+            Request.contact_phone.like(pattern, escape="\\"),
+            User.login.like(pattern, escape="\\"),
+        ))
+    return clauses, {"status": status, "work_type": work_type, "q": query}
 
 
 def _like(text):
