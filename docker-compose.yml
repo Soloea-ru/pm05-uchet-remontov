@@ -15,6 +15,7 @@ services:
       - svyazservice_mysql:/var/lib/mysql
       - ./sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
       - ./sql/migration_module3.sql:/docker-entrypoint-initdb.d/02-indexes.sql
+      - ./sql/migration_admin_journal.sql:/docker-entrypoint-initdb.d/03-journal.sql
 
 volumes:
   svyazservice_mysql:

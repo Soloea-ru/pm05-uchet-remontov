@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Журнал действий{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Журнал действий</h1>
+    <p class="lead">Найдено: {{ total }}. Кто вошёл, что создал, изменил или удалил, и к какой записи это относится.</p>
+  </div>
+</div>
+<form class="filters card" method="get" action="{{ url_for('admin.journal') }}">
+  <div class="field">
+    <label for="action">Действие</label>
+    <select id="action" name="action">
+      <option value="">Все</option>
+      {% for code, label in action_labels.items() %}
+      <option value="{{ code }}" {% if filters.action == code %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <button class="btn btn--primary" type="submit">Показать</button>
+</form>
+{% if rows %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Когда</th>
+        <th>Кто</th>
+        <th>Действие</th>
+        <th>Запись</th>
+        <th>Что сделано</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in rows %}
+      <tr>
+        <td data-label="Когда">{{ item.created_at|dmy }}</td>
+        <td data-label="Кто">{{ item.login }}</td>
+        <td data-label="Действие">{{ action_labels.get(item.action, item.action) }}</td>
+        <td data-label="Запись">{% if item.entity_id %}{{ entity_labels.get(item.entity_type, item.entity_type) }} №{{ item.entity_id }}{% else %}{{ entity_labels.get(item.entity_type, item.entity_type) }}{% endif %}</td>
+        <td data-label="Что сделано">{{ item.summary }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<section class="card empty">
+  <h2>Пока записей нет</h2>
+  <p>Вход диспетчера, создание, изменение и удаление появятся здесь.</p>
+</section>
+{% endif %}
+{% if pages > 1 %}
+<nav class="pager" aria-label="Страницы журнала">
+  {% if page > 1 %}
+  <a class="btn btn--ghost" href="{{ url_for('admin.journal', page=page-1, action=filters.action) }}">Назад</a>
+  {% endif %}
+  <span>Страница {{ page }} из {{ pages }}</span>
+  {% if page < pages %}
+  <a class="btn btn--ghost" href="{{ url_for('admin.journal', page=page+1, action=filters.action) }}">Дальше</a>
+  {% endif %}
+</nav>
+{% endif %}
+{% endblock %}

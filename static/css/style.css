@@ -148,6 +148,8 @@ main { padding: 28px 0 48px; }
 }
 
 .page-head { justify-content: space-between; margin-bottom: 18px; }
+
+.stack { display: grid; gap: 16px; }
 .page-head .lead { margin: 0; }
 
 .grid-3 {

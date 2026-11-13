@@ -25,7 +25,9 @@
         <a href="{{ url_for('main.guide') }}">UI-гайд</a>
         {% if me %}
           {% if me.role == "admin" %}
-          <a href="{{ url_for('main.admin') }}">Все заявки</a>
+          <a href="{{ url_for('admin.tickets') }}">Все заявки</a>
+          <a href="{{ url_for('admin.catalogs') }}">Справочники</a>
+          <a href="{{ url_for('admin.journal') }}">Журнал</a>
           {% else %}
           <a href="{{ url_for('main.my_requests') }}">Мои заявки</a>
           <a href="{{ url_for('main.new_request') }}">Новая заявка</a>

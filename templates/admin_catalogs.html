@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Справочники{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Справочники</h1>
+    <p class="lead">Варианты работ, способы оплаты и статусы заявок. Удаление недоступно, пока запись используется в заявке.</p>
+  </div>
+</div>
+<div class="stack">
+{% for group in groups %}
+<section class="card">
+  <div class="page-head">
+    <h2>{{ group.spec.title }}</h2>
+    <a class="btn btn--primary" href="{{ url_for('admin.new_catalog', kind=group.kind) }}">Добавить</a>
+  </div>
+  {% if group.rows %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>№</th>
+          {% if group.spec.fields|length > 1 %}
+          <th>Код</th>
+          {% endif %}
+          <th>Название</th>
+          {% if group.spec.fields|length > 1 %}
+          <th>Порядок</th>
+          {% endif %}
+          <th>Действия</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in group.rows %}
+        <tr>
+          <td data-label="№">{{ item.id }}</td>
+          {% if group.spec.fields|length > 1 %}
+          <td data-label="Код">{{ item.code }}</td>
+          {% endif %}
+          <td data-label="Название">{{ item.name }}</td>
+          {% if group.spec.fields|length > 1 %}
+          <td data-label="Порядок">{{ item.sort_order }}</td>
+          {% endif %}
+          <td data-label="Действия">
+            <div class="status-form">
+              <a class="btn btn--ghost" href="{{ url_for('admin.edit_catalog', kind=group.kind, item_id=item.id) }}">Изменить</a>
+              <a class="btn btn--ghost" href="{{ url_for('admin.delete_catalog', kind=group.kind, item_id=item.id) }}">Удалить</a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">Записей нет.</p>
+  {% endif %}
+</section>
+{% endfor %}
+</div>
+{% endblock %}
