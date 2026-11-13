@@ -2,15 +2,17 @@ import os
 import re
 import tempfile
 import unittest
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 
 from app import create_app
+from app.admin import JOURNAL_PER_PAGE
 from app.config import mysql_uri
-from app.models import AdminAction, Request, Status, WorkType, db
+from app.models import AdminAction, Request, Status, User, WorkType, db
 from app.validators import validate_admin_ticket, validate_catalog_name, validate_registration, validate_ticket
 
 
@@ -41,6 +43,21 @@ class ConfigTests(unittest.TestCase):
                 mysql_uri(),
                 "mysql+pymysql://svyaz:p%40ss%3Aw%2Frd@127.0.0.1:3306/svyazservice?charset=utf8mb4",
             )
+
+    def test_default_uri_is_mysql(self):
+        env = {
+            "DATABASE_URL": "",
+            "MYSQL_USER": "svyaz",
+            "MYSQL_PASSWORD": "svyaz",
+            "MYSQL_HOST": "127.0.0.1",
+            "MYSQL_PORT": "3306",
+            "MYSQL_DATABASE": "svyazservice",
+        }
+        with patch.dict(os.environ, env, clear=False):
+            uri = mysql_uri()
+        self.assertTrue(uri.startswith("mysql+pymysql://"))
+        self.assertIn("svyazservice", uri)
+        self.assertNotIn("sqlite", uri)
 
 
 class ValidatorTests(unittest.TestCase):
@@ -94,7 +111,7 @@ class ValidatorTests(unittest.TestCase):
         self.assertIn("visit_date", errors)
 
 
-class FlowTests(unittest.TestCase):
+class ClientTestCase(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.app = create_app({
@@ -123,6 +140,16 @@ class FlowTests(unittest.TestCase):
             "login": login,
             "password": password,
         }, follow_redirects=True)
+
+    def assert_no_stack(self, text):
+        lowered = text.lower()
+        self.assertNotIn("traceback", lowered)
+        self.assertNotIn('file "', lowered)
+        self.assertNotIn("sqlalchemy.exc", lowered)
+        self.assertNotIn("werkzeug.exceptions", lowered)
+
+
+class FlowTests(ClientTestCase):
 
     def test_login_error_and_subscriber_isolation(self):
         bad = self.login("demo", "wrong-pass")
@@ -333,6 +360,192 @@ class FlowTests(unittest.TestCase):
         self.assertTrue(free["available"])
         taken = self.client.get("/api/login-available?login=demo").get_json()
         self.assertFalse(taken["available"])
+
+
+class CriteriaTests(ClientTestCase):
+    def test_guest_redirected_from_admin(self):
+        response = self.client.get("/admin", follow_redirects=False)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login", response.headers["Location"])
+
+    def test_logout_closes_admin(self):
+        self.login("admin", "Admin123!")
+        self.assertEqual(self.client.get("/admin").status_code, 200)
+        self.client.post("/logout", data={"csrf_token": self.token("/admin")})
+        response = self.client.get("/admin", follow_redirects=False)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login", response.headers["Location"])
+
+    def test_subscriber_cannot_post_admin(self):
+        self.login("demo", "Demo123!")
+        token = self.token("/requests/new")
+        response = self.client.post("/admin/requests/new", data={
+            "csrf_token": token,
+            "address": "ул. Чужой доступ, д. 1",
+            "apartment": "1",
+            "contact_phone": "+7 900 111-22-33",
+            "problem": "Абонент не должен создавать заявку через панель.",
+            "work_type_id": "1",
+            "payment_type_id": "1",
+            "visit_date": date.today().isoformat(),
+            "user_id": "2",
+            "status_id": "1",
+        })
+        self.assertEqual(response.status_code, 403)
+        self.assert_no_stack(response.get_data(as_text=True))
+        with self.app.app_context():
+            found = db.session.execute(
+                select(Request.id).where(Request.address == "ул. Чужой доступ, д. 1")
+            ).scalar_one_or_none()
+        self.assertIsNone(found)
+
+    def test_csrf_rejected_on_login(self):
+        response = self.client.post("/login", data={
+            "login": "admin",
+            "password": "Admin123!",
+        })
+        self.assertEqual(response.status_code, 400)
+        text = response.get_data(as_text=True)
+        self.assertIn("Запрос устарел", text)
+        self.assert_no_stack(text)
+        home = self.client.get("/admin", follow_redirects=False)
+        self.assertEqual(home.status_code, 302)
+
+    def test_passwords_are_hashed(self):
+        with self.app.app_context():
+            rows = db.session.execute(select(User.login, User.password_hash)).all()
+        logins = {login: password_hash for login, password_hash in rows}
+        self.assertTrue(logins["admin"].startswith("pbkdf2:sha256:"))
+        self.assertTrue(logins["demo"].startswith("pbkdf2:sha256:"))
+        self.assertNotIn("Admin123!", logins["admin"])
+        self.assertNotIn("Demo123!", logins["demo"])
+        login_page = self.client.get("/login").get_data(as_text=True)
+        self.assertNotIn("pbkdf2", login_page)
+        self.assertNotIn(logins["admin"], login_page)
+
+    def test_search_and_empty_filter(self):
+        self.login("admin", "Admin123!")
+        found = self.client.get("/admin?q=Садовая").get_data(as_text=True)
+        self.assertIn("ул. Садовая, д. 15", found)
+        self.assertNotIn("ул. Учебная, д. 1", found)
+        with self.app.app_context():
+            work_id = db.session.execute(
+                select(WorkType.id).where(WorkType.name == "Подключение")
+            ).scalar_one()
+        by_work = self.client.get(f"/admin?work_type={work_id}").get_data(as_text=True)
+        self.assertIn("ул. Садовая, д. 15", by_work)
+        self.assertNotIn("ул. Учебная, д. 1", by_work)
+        empty = self.client.get("/admin?q=нет-таких-записей-xyz").get_data(as_text=True)
+        self.assertIn("По этому фильтру заявок нет", empty)
+
+    def test_catalog_edit(self):
+        self.login("admin", "Admin123!")
+        created = self.client.post("/admin/catalogs/work-types/new", data={
+            "csrf_token": self.token("/admin/catalogs/work-types/new"),
+            "name": "Диагностика",
+        }, follow_redirects=True)
+        self.assertIn("Запись сохранена", created.get_data(as_text=True))
+        with self.app.app_context():
+            item_id = db.session.execute(
+                select(WorkType.id).where(WorkType.name == "Диагностика")
+            ).scalar_one()
+        edited = self.client.post(f"/admin/catalogs/work-types/{item_id}/edit", data={
+            "csrf_token": self.token(f"/admin/catalogs/work-types/{item_id}/edit"),
+            "name": "Диагностика линии",
+        }, follow_redirects=True)
+        text = edited.get_data(as_text=True)
+        self.assertIn("Запись изменена", text)
+        self.assertIn("Диагностика линии", text)
+        with self.app.app_context():
+            name = db.session.execute(select(WorkType.name).where(WorkType.id == item_id)).scalar_one()
+            actions = db.session.execute(select(AdminAction.action, AdminAction.entity_type)).all()
+        self.assertEqual(name, "Диагностика линии")
+        self.assertIn(("update", "work_type"), list(actions))
+
+    def test_error_pages(self):
+        missing = self.client.get("/нет-такой-страницы")
+        self.assertEqual(missing.status_code, 404)
+        missing_text = missing.get_data(as_text=True)
+        self.assertIn("Страница не найдена", missing_text)
+        self.assert_no_stack(missing_text)
+
+        self.login("demo", "Demo123!")
+        forbidden = self.client.get("/admin/journal")
+        self.assertEqual(forbidden.status_code, 403)
+        forbidden_text = forbidden.get_data(as_text=True)
+        self.assertIn("Недостаточно прав", forbidden_text)
+        self.assert_no_stack(forbidden_text)
+
+        self.client.post("/logout", data={"csrf_token": self.token("/requests")})
+        self.login("admin", "Admin123!")
+        ticket_missing = self.client.get("/admin/requests/999/edit")
+        self.assertEqual(ticket_missing.status_code, 404)
+        self.assert_no_stack(ticket_missing.get_data(as_text=True))
+
+    def test_database_error_page(self):
+        self.login("admin", "Admin123!")
+        with patch("app.admin.db.session.execute", side_effect=SQLAlchemyError("down")):
+            page = self.client.get("/admin")
+        self.assertEqual(page.status_code, 503)
+        text = page.get_data(as_text=True)
+        self.assertIn("База недоступна", text)
+        self.assert_no_stack(text)
+
+    def test_output_is_escaped(self):
+        self.login("admin", "Admin123!")
+        created = self.client.post("/admin/requests/new", data={
+            "csrf_token": self.token("/admin/requests/new"),
+            "address": "<script>alert(1)</script>",
+            "apartment": "1",
+            "contact_phone": "+7 900 333-44-55",
+            "problem": "Проверка экранирования <b>разметки</b>.",
+            "work_type_id": "1",
+            "payment_type_id": "1",
+            "visit_date": date.today().isoformat(),
+            "user_id": "2",
+            "status_id": "1",
+        }, follow_redirects=True)
+        text = created.get_data(as_text=True)
+        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", text)
+        self.assertNotIn("<script>alert(1)</script>", text)
+        self.assertIn("&lt;b&gt;разметки&lt;/b&gt;", text)
+
+    def test_journal_filter_and_pages(self):
+        self.login("admin", "Admin123!")
+        self.client.post("/admin/catalogs/work-types/new", data={
+            "csrf_token": self.token("/admin/catalogs/work-types/new"),
+            "name": "Диагностика",
+        }, follow_redirects=True)
+        with self.app.app_context():
+            admin = db.session.execute(select(User).where(User.login == "admin")).scalar_one()
+            for index in range(JOURNAL_PER_PAGE + 2):
+                db.session.add(AdminAction(
+                    user_id=admin.id,
+                    login=admin.login,
+                    action="create",
+                    entity_type="request",
+                    entity_id=index + 1,
+                    summary=f"Пагинация журнала {index}",
+                    created_at=datetime(2026, 11, 1, 12, index % 60),
+                ))
+            db.session.commit()
+
+        login_only = self.client.get("/admin/journal?action=login").get_data(as_text=True)
+        self.assertIn("Вход в панель диспетчера", login_only)
+        self.assertNotIn("Пагинация журнала", login_only)
+        self.assertNotIn("Диагностика", login_only)
+
+        create_only = self.client.get("/admin/journal?action=create").get_data(as_text=True)
+        self.assertIn("Диагностика", create_only)
+        self.assertNotIn("Вход в панель диспетчера", create_only)
+
+        first = self.client.get("/admin/journal").get_data(as_text=True)
+        second = self.client.get("/admin/journal?page=2").get_data(as_text=True)
+        self.assertIn("Страница 1 из", first)
+        self.assertIn("Пагинация журнала 0", second)
+        self.assertNotIn("Пагинация журнала 0", first)
+        self.assertIn("Вход в панель диспетчера", first)
+        self.assertNotIn("Вход в панель диспетчера", second)
 
 
 if __name__ == "__main__":

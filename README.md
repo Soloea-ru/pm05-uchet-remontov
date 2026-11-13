@@ -58,7 +58,9 @@ py -3 -m venv .venv
 
 ## Проверки
 
-Автотесты **не требуют MySQL**: они поднимают временный SQLite через `SQLALCHEMY_DATABASE_URI` в тестовом конфиге.
+Методика, критерии качества/надёжности, состав оборудования и таблица прогона (шаг → ожидание → факт): `docs/testing.md`.
+
+Автотесты **не требуют MySQL**: они поднимают временный SQLite через `SQLALCHEMY_DATABASE_URI` в тестовом конфиге. Рабочее приложение по умолчанию подключается к MySQL.
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -t . -v
@@ -102,6 +104,7 @@ py -3 -m venv .venv
 | 3. Доработка | `sql/migration_module3.sql`, `docs/checklist.md` |
 | 4. MySQL и ORM | `app/config.py`, `app/models.py`, `docker-compose.yml`, `.env.example` |
 | 5. CRUD и журнал | `app/admin.py`, `app/journal.py`, `sql/migration_admin_journal.sql`, `templates/admin_*.html` |
+| 6. Тестирование и критерии | `docs/testing.md`, `docs/checklist.md`, `tests/test_app.py` |
 
 Слайдер на главной: 4 кадра 1200×675, автопрокрутка 3 секунды, кнопки назад и вперёд. Макет сжимается под ширину 390px.
 
