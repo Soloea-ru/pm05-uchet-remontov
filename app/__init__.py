@@ -2,6 +2,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 from flask import Flask, render_template
+from sqlalchemy.exc import SQLAlchemyError
 
 from .config import Config, ROOT, load_env_file
 from .models import db, init_db
@@ -45,10 +46,14 @@ def create_app(config=None):
 
     db.init_app(app)
 
-    from .routes import bp, inject_template_context
+    from .admin import bp as admin_bp
+    from .auth import inject_template_context, protect_post
+    from .routes import bp
 
     app.context_processor(inject_template_context)
+    app.before_request(protect_post)
     app.register_blueprint(bp)
+    app.register_blueprint(admin_bp)
     app.add_template_filter(format_dmy, "dmy")
 
     @app.errorhandler(403)
@@ -77,6 +82,25 @@ def create_app(config=None):
             title="Запрос устарел",
             message="Обновите страницу и отправьте форму ещё раз.",
         ), 400
+
+    @app.errorhandler(500)
+    def server_error(_error):
+        return render_template(
+            "error.html",
+            code=500,
+            title="Сбой сервера",
+            message="Попробуйте ещё раз или вернитесь позже.",
+        ), 500
+
+    @app.errorhandler(SQLAlchemyError)
+    def database_error(_error):
+        db.session.rollback()
+        return render_template(
+            "error.html",
+            code=503,
+            title="База недоступна",
+            message="Не удалось обратиться к базе. Проверьте, что MySQL запущен, и обновите страницу.",
+        ), 503
 
     with app.app_context():
         init_db()

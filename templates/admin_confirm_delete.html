@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Удаление{% endblock %}
+{% block content %}
+<section class="narrow card">
+  <p class="eyebrow">Подтверждение</p>
+  <h1>Удалить {{ title }}?</h1>
+  <p class="lead">{{ description }}</p>
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <button class="btn btn--primary" type="submit">Удалить</button>
+    <a class="btn btn--ghost" href="{{ cancel_url }}">Отмена</a>
+  </form>
+</section>
+{% endblock %}

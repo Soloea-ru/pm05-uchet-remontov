@@ -4,10 +4,11 @@
 <div class="page-head">
   <div>
     <h1>Все заявки</h1>
-    <p class="lead">Найдено: {{ total }}. Статус меняется здесь же, фильтр и страницы сохраняются.</p>
+    <p class="lead">Найдено: {{ total }}. Можно создать, изменить или удалить заявку. Статус меняется в таблице, фильтр и страницы сохраняются.</p>
   </div>
+  <a class="btn btn--primary" href="{{ url_for('admin.new_request') }}">Новая заявка</a>
 </div>
-<form class="filters card" method="get" action="{{ url_for('main.admin') }}">
+<form class="filters card" method="get" action="{{ url_for('admin.tickets') }}">
   <div class="field">
     <label for="status">Статус</label>
     <select id="status" name="status">
@@ -45,6 +46,7 @@
         <th>Визит</th>
         <th>Оплата</th>
         <th>Статус</th>
+        <th>Действия</th>
       </tr>
     </thead>
     <tbody>
@@ -58,7 +60,7 @@
         <td data-label="Визит">{{ item.visit_date|dmy }}</td>
         <td data-label="Оплата">{{ item.payment_type }}</td>
         <td data-label="Статус">
-          <form method="post" action="{{ url_for('main.set_status', ticket_id=item.id) }}" class="status-form">
+          <form method="post" action="{{ url_for('admin.set_status', ticket_id=item.id) }}" class="status-form">
             <input type="hidden" name="csrf_token" value="{{ csrf }}">
             <input type="hidden" name="q" value="{{ filters.q }}">
             <input type="hidden" name="status" value="{{ filters.status }}">
@@ -74,6 +76,12 @@
           </form>
           {% if item.updated_at %}<p class="muted">Обновлено {{ item.updated_at|dmy }}</p>{% endif %}
         </td>
+        <td data-label="Действия">
+          <div class="status-form">
+            <a class="btn btn--ghost" href="{{ url_for('admin.edit_request', ticket_id=item.id) }}">Изменить</a>
+            <a class="btn btn--ghost" href="{{ url_for('admin.delete_request', ticket_id=item.id) }}">Удалить</a>
+          </div>
+        </td>
       </tr>
       {% endfor %}
     </tbody>
@@ -88,11 +96,11 @@
 {% if pages > 1 %}
 <nav class="pager" aria-label="Страницы списка">
   {% if page > 1 %}
-  <a class="btn btn--ghost" href="{{ url_for('main.admin', page=page-1, q=filters.q, status=filters.status, work_type=filters.work_type) }}">Назад</a>
+  <a class="btn btn--ghost" href="{{ url_for('admin.tickets', page=page-1, q=filters.q, status=filters.status, work_type=filters.work_type) }}">Назад</a>
   {% endif %}
   <span>Страница {{ page }} из {{ pages }}</span>
   {% if page < pages %}
-  <a class="btn btn--ghost" href="{{ url_for('main.admin', page=page+1, q=filters.q, status=filters.status, work_type=filters.work_type) }}">Дальше</a>
+  <a class="btn btn--ghost" href="{{ url_for('admin.tickets', page=page+1, q=filters.q, status=filters.status, work_type=filters.work_type) }}">Дальше</a>
   {% endif %}
 </nav>
 {% endif %}

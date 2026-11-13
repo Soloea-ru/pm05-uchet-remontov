@@ -9,7 +9,7 @@
     <div class="hero__actions">
       {% if me %}
         {% if me.role == "admin" %}
-        <a class="btn btn--primary" href="{{ url_for('main.admin') }}">Открыть панель</a>
+        <a class="btn btn--primary" href="{{ url_for('admin.tickets') }}">Открыть панель</a>
         {% else %}
         <a class="btn btn--primary" href="{{ url_for('main.new_request') }}">Новая заявка</a>
         <a class="btn btn--ghost" href="{{ url_for('main.my_requests') }}">Мои заявки</a>

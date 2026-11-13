@@ -20,6 +20,7 @@ class User(db.Model):
     role = db.Column(String(16), nullable=False, default="user")
     created_at = db.Column(DateTime, nullable=False, default=datetime.now)
     requests = relationship("Request", back_populates="user")
+    actions = relationship("AdminAction", back_populates="user")
 
 
 class WorkType(db.Model):
@@ -76,6 +77,29 @@ class Request(db.Model):
     work_type_row = relationship("WorkType", back_populates="requests")
     payment_type_row = relationship("PaymentType", back_populates="requests")
     status_row = relationship("Status", back_populates="requests")
+
+
+class AdminAction(db.Model):
+    __tablename__ = "admin_actions"
+    __table_args__ = (
+        Index("idx_admin_actions_created_at", "created_at"),
+        Index("idx_admin_actions_user_id", "user_id"),
+        Index("idx_admin_actions_entity", "entity_type", "entity_id"),
+    )
+
+    id = db.Column(Integer, primary_key=True)
+    user_id = db.Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
+    login = db.Column(String(32), nullable=False)
+    created_at = db.Column(DateTime, nullable=False, default=datetime.now)
+    action = db.Column(String(16), nullable=False)
+    entity_type = db.Column(String(32), nullable=False)
+    entity_id = db.Column(Integer)
+    summary = db.Column(String(255), nullable=False)
+    user = relationship("User", back_populates="actions")
+
+
+def exists(model, row_id):
+    return row_id is not None and db.session.get(model, row_id) is not None
 
 
 def tickets_select():

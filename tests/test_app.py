@@ -10,8 +10,8 @@ from sqlalchemy import select
 
 from app import create_app
 from app.config import mysql_uri
-from app.models import Request, Status, db
-from app.validators import validate_registration, validate_ticket
+from app.models import AdminAction, Request, Status, WorkType, db
+from app.validators import validate_admin_ticket, validate_catalog_name, validate_registration, validate_ticket
 
 
 class ConfigTests(unittest.TestCase):
@@ -63,6 +63,23 @@ class ValidatorTests(unittest.TestCase):
         })
         self.assertEqual(errors, {})
         self.assertEqual(cleaned["login"], "student")
+
+    def test_catalog_name_and_admin_ticket_fields(self):
+        errors, _cleaned = validate_catalog_name({"name": "А"})
+        self.assertIn("name", errors)
+        errors, cleaned = validate_admin_ticket({
+            "address": "ул. Учебная, д. 10",
+            "apartment": "2",
+            "contact_phone": "+7 900 333-44-55",
+            "problem": "Нет связи второй день подряд.",
+            "work_type_id": "1",
+            "payment_type_id": "1",
+            "visit_date": "2020-01-01",
+            "user_id": "2",
+            "status_id": "1",
+        })
+        self.assertEqual(errors, {})
+        self.assertEqual(cleaned["user_id"], 2)
 
     def test_ticket_rejects_a_past_visit(self):
         errors, _cleaned = validate_ticket({
@@ -189,6 +206,127 @@ class FlowTests(unittest.TestCase):
                 select(Status.code).join(Request, Request.status_id == Status.id).where(Request.id == 1)
             ).scalar_one()
         self.assertEqual(code, "done")
+
+    def test_admin_crud_journal_and_csrf(self):
+        self.login("admin", "Admin123!")
+        empty = self.client.post("/admin/requests/new", data={
+            "csrf_token": self.token("/admin/requests/new"),
+            "address": "",
+            "apartment": "",
+            "contact_phone": "",
+            "problem": "",
+            "work_type_id": "",
+            "payment_type_id": "",
+            "visit_date": "",
+            "user_id": "",
+            "status_id": "",
+        })
+        self.assertEqual(empty.status_code, 400)
+        self.assertIn("Укажите адрес", empty.get_data(as_text=True))
+
+        forbidden = self.client.post("/admin/requests/new", data={
+            "address": "ул. Новая, д. 9",
+            "apartment": "4",
+            "contact_phone": "+7 900 333-44-55",
+            "problem": "Проверка CSRF на форме диспетчера.",
+            "work_type_id": "1",
+            "payment_type_id": "1",
+            "visit_date": date.today().isoformat(),
+            "user_id": "2",
+            "status_id": "1",
+        })
+        self.assertEqual(forbidden.status_code, 400)
+
+        created = self.client.post("/admin/requests/new", data={
+            "csrf_token": self.token("/admin/requests/new"),
+            "address": "ул. Журнальная, д. 10",
+            "apartment": "4",
+            "contact_phone": "+7 900 333-44-55",
+            "problem": "Диспетчер создаёт заявку через панель.",
+            "work_type_id": "1",
+            "payment_type_id": "1",
+            "visit_date": "2020-01-01",
+            "user_id": "2",
+            "status_id": "1",
+        }, follow_redirects=True)
+        self.assertIn("Заявка создана", created.get_data(as_text=True))
+        self.assertIn("ул. Журнальная, д. 10", created.get_data(as_text=True))
+
+        with self.app.app_context():
+            ticket_id = db.session.execute(
+                select(Request.id).where(Request.address == "ул. Журнальная, д. 10")
+            ).scalar_one()
+
+        edited = self.client.post(f"/admin/requests/{ticket_id}/edit", data={
+            "csrf_token": self.token(f"/admin/requests/{ticket_id}/edit"),
+            "address": "ул. Журнальная, д. 12",
+            "apartment": "4",
+            "contact_phone": "+7 900 333-44-55",
+            "problem": "Диспетчер создаёт заявку через панель.",
+            "work_type_id": "1",
+            "payment_type_id": "1",
+            "visit_date": "2020-01-01",
+            "user_id": "2",
+            "status_id": "1",
+        }, follow_redirects=True)
+        self.assertIn("изменена", edited.get_data(as_text=True))
+        self.assertIn("ул. Журнальная, д. 12", edited.get_data(as_text=True))
+
+        confirm = self.client.get(f"/admin/requests/{ticket_id}/delete")
+        self.assertIn("Удалить заявку", confirm.get_data(as_text=True))
+        deleted = self.client.post(f"/admin/requests/{ticket_id}/delete", data={
+            "csrf_token": self.token(f"/admin/requests/{ticket_id}/delete"),
+        }, follow_redirects=True)
+        self.assertIn("удалена", deleted.get_data(as_text=True))
+        self.assertNotIn("ул. Журнальная, д. 12", deleted.get_data(as_text=True))
+
+        catalog = self.client.post("/admin/catalogs/work-types/new", data={
+            "csrf_token": self.token("/admin/catalogs/work-types/new"),
+            "name": "Диагностика",
+        }, follow_redirects=True)
+        self.assertIn("Запись сохранена", catalog.get_data(as_text=True))
+        self.assertIn("Диагностика", catalog.get_data(as_text=True))
+        duplicate = self.client.post("/admin/catalogs/work-types/new", data={
+            "csrf_token": self.token("/admin/catalogs/work-types/new"),
+            "name": "Диагностика",
+        })
+        self.assertEqual(duplicate.status_code, 400)
+        self.assertIn("уже заняты", duplicate.get_data(as_text=True))
+
+        with self.app.app_context():
+            extra_id = db.session.execute(
+                select(WorkType.id).where(WorkType.name == "Диагностика")
+            ).scalar_one()
+            used_id = db.session.execute(
+                select(WorkType.id).where(WorkType.name == "Подключение")
+            ).scalar_one()
+        blocked = self.client.get(f"/admin/catalogs/work-types/{used_id}/delete", follow_redirects=True)
+        self.assertIn("есть заявки", blocked.get_data(as_text=True))
+        removed = self.client.post(f"/admin/catalogs/work-types/{extra_id}/delete", data={
+            "csrf_token": self.token(f"/admin/catalogs/work-types/{extra_id}/delete"),
+        }, follow_redirects=True)
+        self.assertIn("удалена", removed.get_data(as_text=True))
+
+        journal = self.client.get("/admin/journal").get_data(as_text=True)
+        self.assertIn("Вход в панель диспетчера", journal)
+        self.assertIn("Создание", journal)
+        self.assertIn("Изменение", journal)
+        self.assertIn("Удаление", journal)
+
+        with self.app.app_context():
+            actions = db.session.execute(select(AdminAction.action).order_by(AdminAction.id)).scalars().all()
+        self.assertIn("login", actions)
+        self.assertIn("create", actions)
+        self.assertIn("update", actions)
+        self.assertIn("delete", actions)
+
+        missing = self.client.get("/admin/requests/999/edit")
+        self.assertEqual(missing.status_code, 404)
+
+        self.client.post("/logout", data={"csrf_token": self.token("/admin")})
+        as_user = self.login("demo", "Demo123!")
+        self.assertEqual(self.client.get("/admin/journal").status_code, 403)
+        self.assertNotIn("Журнал действий", as_user.get_data(as_text=True))
 
     def test_login_check_api(self):
         free = self.client.get("/api/login-available?login=fresh_user").get_json()

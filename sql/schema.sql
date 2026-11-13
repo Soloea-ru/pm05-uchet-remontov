@@ -2,6 +2,9 @@
 -- Схема MySQL 8 (utf8mb4). Учебные пользователи и заявки добавляет приложение при пустой базе.
 -- Вторичные индексы: sql/migration_module3.sql.
 -- Связи Crow's Foot: users 1—N requests; справочники 1—N requests.
+-- Журнал действий администратора: users 1—N admin_actions.
+SET NAMES utf8mb4;
+SET CHARACTER SET utf8mb4;
 
 CREATE TABLE IF NOT EXISTS users (
     id INT NOT NULL AUTO_INCREMENT,
@@ -71,18 +74,24 @@ CREATE TABLE IF NOT EXISTS requests (
     CONSTRAINT fk_requests_status FOREIGN KEY (status_id) REFERENCES statuses (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT IGNORE INTO work_types (name) VALUES
-    ('Подключение'),
-    ('Ремонт линии'),
-    ('Настройка оборудования'),
-    ('Перенос адреса');
+CREATE TABLE IF NOT EXISTS admin_actions (
+    id INT NOT NULL AUTO_INCREMENT,
+    user_id INT NULL,
+    login VARCHAR(32) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    action VARCHAR(16) NOT NULL,
+    entity_type VARCHAR(32) NOT NULL,
+    entity_id INT NULL,
+    summary VARCHAR(255) NOT NULL,
+    PRIMARY KEY (id),
+    KEY idx_admin_actions_created_at (created_at),
+    KEY idx_admin_actions_user_id (user_id),
+    KEY idx_admin_actions_entity (entity_type, entity_id),
+    CONSTRAINT ck_admin_actions_action CHECK (action IN ('login', 'create', 'update', 'delete')),
+    CONSTRAINT ck_admin_actions_login CHECK (CHAR_LENGTH(TRIM(login)) >= 1),
+    CONSTRAINT ck_admin_actions_summary CHECK (CHAR_LENGTH(TRIM(summary)) >= 1),
+    CONSTRAINT fk_admin_actions_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT IGNORE INTO payment_types (name) VALUES
-    ('Оплачено'),
-    ('Рассрочка'),
-    ('По факту');
-
-INSERT IGNORE INTO statuses (code, name, sort_order) VALUES
-    ('new', 'Новая', 1),
-    ('in_progress', 'В работе', 2),
-    ('done', 'Выполнена', 3);
+-- Справочники, учебные пользователи и заявки добавляет приложение при пустой базе
+-- (кириллица в init-скриптах Docker MySQL приходит в latin1 и портит названия).
